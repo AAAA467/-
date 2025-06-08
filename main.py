@@ -80,6 +80,7 @@ def generate_task1():
 
 def generate_task2():
     format_type = random.choice(['0-xx', 'x-xx', 'xx-xx'])
+
     if format_type == '0-xx':
         left = 0
         right = random.randint(10, 99)
@@ -89,12 +90,15 @@ def generate_task2():
     else:
         left = random.randint(10, 99)
         right = random.randint(10, 99)
+
     U_prime_str = f"{left}-{right}"
     U_prime_value = parse_u_value(left, right)
     U_value = int(U_prime_value * 0.95)
     U_str = u_number_to_format(U_value)
+
     D = random.randint(1, 9999)
     V = int(U_prime_value * D / 1000)
+
     return {
         'text': f'Д = {D}, В = {V}\nВопрос: У′ = ?, У = ?',
         'answer': f'{U_prime_str},{U_str}',
@@ -138,6 +142,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def choose_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     task_text = update.message.text
+
     if task_text == 'Задача 1':
         task = generate_task1()
     elif task_text == 'Задача 2':
@@ -146,6 +151,7 @@ async def choose_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task = generate_task3()
     else:
         return CHOOSING
+
     user_state[user_id] = task
     await update.message.reply_text(
         f"📘 Условие:\n{task['text']}\n\n✍️ Введите ответ или /skip",
@@ -156,31 +162,39 @@ async def choose_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     task = user_state.get(user_id)
+
     if not task:
         await update.message.reply_text("⚠️ Нет активной задачи. Введите /start.")
         return CHOOSING
+
     user_input = update.message.text.replace(" ", "").lower()
     correct = task['answer'].replace(" ", "").lower()
+
     if user_input == correct:
         await update.message.reply_text("✅ Верно!")
     else:
         await update.message.reply_text(
             f"❌ Неверно.\n✅ Правильный ответ: {task['answer']}\n\n📘 Решение:\n{task['solution']}"
         )
+
     await update.message.reply_text("🔁 Хотите новую задачу? Выберите ниже:", reply_markup=menu_keyboard)
     return CHOOSING
 
 async def skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     task = user_state.get(user_id)
+
     if not task:
         await update.message.reply_text("⚠️ Нет активной задачи. Введите /start.")
         return CHOOSING
+
     await update.message.reply_text(
         f"✅ Ответ: {task['answer']}\n\n📘 Решение:\n{task['solution']}"
     )
     await update.message.reply_text("🔁 Хотите новую задачу? Выберите ниже:", reply_markup=menu_keyboard)
     return CHOOSING
+
+# --- ОБРАБОТЧИК ОШИБОК ---
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logging.error("❌ Ошибка при обработке обновления:", exc_info=context.error)
@@ -188,12 +202,13 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 # --- MAIN ---
 
 def main():
-    keep_alive()  # запускаем Flask-сервер перед Telegram
     TOKEN = os.environ.get("BOT_TOKEN")
     if not TOKEN:
-        print("❌ Установите переменную окружения BOT_TOKEN!")
+        print("❌ Установите переменную окружения BOT_TOKEN в настройках Replit!")
         return
+
     app = ApplicationBuilder().token(TOKEN).build()
+
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -207,10 +222,14 @@ def main():
         },
         fallbacks=[CommandHandler("start", start)],
     )
+
     app.add_handler(conv_handler)
-    app.add_error_handler(error_handler)
+    app.add_error_handler(error_handler)  # <--- вот здесь добавлен обработчик ошибок
+
     print("✅ Бот запущен...")
+
+    keep_alive()
     app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    main()     внеси эти изменения в этот код и верни мне его готовым !
