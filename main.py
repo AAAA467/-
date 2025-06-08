@@ -14,10 +14,7 @@ from telegram.ext import (
 # Импортируем keep_alive
 from keep_alive import keep_alive
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+logging.basicConfig(level=logging.INFO)
 
 CHOOSING, SOLVING = range(2)
 user_state = {}
@@ -27,7 +24,7 @@ menu_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# --- ФУНКЦИИ ОБРАБОТКИ ЗАДАЧ ---
+# --- все функции генерации задач и хендлеры без изменений ---
 
 def generate_random_u_format():
     format_type = random.choice(['0-x', '0-xx', 'x-xx', 'xx-xx'])
@@ -121,8 +118,6 @@ def generate_task3():
                     f'{D_prime:.6f} * 0.95 = {D:.6f} → Д={D_out}'
     }
 
-# --- ХЕНДЛЕРЫ ТЕЛЕГРАМ ---
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Привет! Я бот для расчётных задач.\n\n"
@@ -194,13 +189,6 @@ async def skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔁 Хотите новую задачу? Выберите ниже:", reply_markup=menu_keyboard)
     return CHOOSING
 
-# --- ОБРАБОТЧИК ОШИБОК ---
-
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logging.error("❌ Ошибка при обработке обновления:", exc_info=context.error)
-
-# --- MAIN ---
-
 def main():
     TOKEN = os.environ.get("BOT_TOKEN")
     if not TOKEN:
@@ -224,11 +212,12 @@ def main():
     )
 
     app.add_handler(conv_handler)
-    app.add_error_handler(error_handler)  # <--- вот здесь добавлен обработчик ошибок
 
     print("✅ Бот запущен...")
 
+    # Запускаем keep_alive, чтобы Flask держал сервер живым в Replit
     keep_alive()
+
     app.run_polling()
 
 if __name__ == "__main__":
