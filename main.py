@@ -232,4 +232,4 @@ def main():
     app.run_polling()
 
 if __name__ == "__main__":
-    main()     внеси эти изменения в этот код и верни мне его готовым !
+    main()
