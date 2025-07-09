@@ -1,25 +1,20 @@
 import os
 import random
 import logging
-from flask import Flask, request, abort
-from telegram import Bot, Update, ReplyKeyboardMarkup
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, ConversationHandler, filters, ContextTypes
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    ConversationHandler,
+    filters,
+)
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-
-app = Flask(__name__)
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    raise RuntimeError("❌ BOT_TOKEN not set in environment variables!")
-
-bot = Bot(token=BOT_TOKEN)
-
-# Dispatcher для обработки апдейтов
-dispatcher = Dispatcher(bot, None, workers=0, use_context=True)
 
 CHOOSING, SOLVING = range(2)
 user_state = {}
@@ -29,13 +24,112 @@ menu_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# --- Твои функции генерации задач и хендлеры (как в твоем коде) ---
-# ... (сюда вставь все функции generate_task1, start, choose_task, answer_handler, skip_handler и т.д.) ...
-# Для сокращения здесь — вставь твой код из предыдущего сообщения с функциями и хендлерами
+# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
-# ВАЖНО: перепиши хендлеры, чтобы они были async, как у тебя, но Flask будет их запускать в sync режиме через dispatcher
+def generate_random_u_format():
+    format_type = random.choice(['0-x', '0-xx', 'x-xx', 'xx-xx'])
+    if format_type == '0-x':
+        left = 0
+        right = random.randint(1, 9)
+    elif format_type == '0-xx':
+        left = 0
+        right = random.randint(10, 99)
+    elif format_type == 'x-xx':
+        left = random.randint(1, 9)
+        right = random.randint(10, 99)
+    else:
+        left = random.randint(10, 99)
+        right = random.randint(10, 99)
+    return f"{left}-{right}", left, right
 
-async def start(update, context):
+def parse_u_value(left, right):
+    if left == 0:
+        return right
+    return int(f"{left}{right:02d}")
+
+def cut_digits(number, max_digits):
+    s = str(int(number))  # Только целая часть
+    return s[:max_digits]
+
+def float_to_u_format(value: float) -> str:
+    int_value = int(value)
+    s = str(int_value)
+    if len(s) <= 2:
+        return f"0-{s.zfill(2)}"
+    elif len(s) == 3:
+        return f"{s[0]}-{s[1:]}"
+    else:
+        return f"{s[:2]}-{s[2:]}"
+
+# --- ЗАДАЧИ ---
+
+def generate_task1():
+    Дальность = random.randint(1, 9999)
+    Угломер_str, left, right = generate_random_u_format()
+    Угломер_value = parse_u_value(left, right)
+    Высота_prime = (Дальность * Угломер_value) / 1000
+    Высота = Высота_prime * 1.05
+    Высота_out = cut_digits(Высота_prime, 3)
+    Высота_final_out = cut_digits(Высота, 3)
+    return {
+        'text': f'Дальность = {Дальность}, Угломер = {Угломер_str}\nВопрос: Высота′ = ?, Высота = ?',
+        'answer': f'{Высота_out},{Высота_final_out}',
+        'solution': (f'Угломер = {Угломер_value}\n'
+                     f'{Дальность} * {Угломер_value} / 1000 = {Высота_prime} → Высота′={Высота_out}\n'
+                     f'{Высота_prime} * 1.05 = {Высота} → Высота={Высота_final_out}')
+    }
+
+def generate_task2():
+    Высота = random.randint(10, 500)
+    Дальность = random.randint(10, 500)
+
+    Угломер_prime_value = Высота * 1000 / Дальность
+    Угломер_value = Угломер_prime_value * 0.95
+
+    Угломер_prime_str = float_to_u_format(Угломер_prime_value)
+    Угломер_str = float_to_u_format(Угломер_value)
+
+    return {
+        'text': f'Дальность = {Дальность}, Высота = {Высота}\nВопрос: Угломер′ = ?, Угломер = ?',
+        'answer': f'{Угломер_prime_str},{Угломер_str}',
+        'solution': (f'{Высота} * 1000 / {Дальность} = {Угломер_prime_value} → Угломер′={Угломер_prime_str}\n'
+                     f'{Угломер_prime_value} * 0.95 = {Угломер_value} → Угломер={Угломер_str}')
+    }
+
+def generate_task3():
+    Высота = random.randint(10, 500)
+    Угломер_str, left, right = generate_random_u_format()
+    Угломер_value = parse_u_value(left, right)
+
+    Дальность_prime = (Высота * 1000) / Угломер_value
+    Дальность = Дальность_prime * 0.95
+
+    Дальность_prime_out = cut_digits(Дальность_prime, 4)
+    Дальность_out = cut_digits(Дальность, 4)
+
+    return {
+        'text': f'Высота = {Высота}, Угломер = {Угломер_str}\nВопрос: Дальность′ = ?, Дальность = ?',
+        'answer': f'{Дальность_prime_out},{Дальность_out}',
+        'solution': (f'Угломер = {Угломер_value}\n'
+                     f'{Высота} * 1000 / {Угломер_value} = {Дальность_prime} → Дальность′={Дальность_prime_out}\n'
+                     f'{Дальность_prime} * 0.95 = {Дальность} → Дальность={Дальность_out}')
+    }
+
+def generate_task4():
+    азимут_цели = random.randint(1, 359)
+    азимут_ориентира = random.randint(1, 359)
+    числовой_курс = азимут_цели - азимут_ориентира
+    if числовой_курс < 0:
+        числовой_курс += 360
+    return {
+        'text': f'Азимут цели = {азимут_цели}, Азимут ориентира = {азимут_ориентира}\nВопрос: Числовой курс цели = ?',
+        'answer': str(числовой_курс),
+        'solution': f'Числовой курс цели = {азимут_цели} - {азимут_ориентира} = {числовой_курс}'
+    }
+
+# --- ХЕНДЛЕРЫ ---
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Привет! Я бот для расчётных задач.\n\n"
         "Выбирай одну из задач ниже:\n"
@@ -52,40 +146,80 @@ async def start(update, context):
     )
     return CHOOSING
 
-# Аналогично остальные хендлеры...
+async def choose_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    text = update.message.text
 
-# Добавляем хендлеры в диспетчер
-from telegram.ext import ConversationHandler, CommandHandler, MessageHandler, filters
-
-conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("start", start)],
-    states={
-        CHOOSING: [
-            MessageHandler(filters.Regex("^Задача [1-4]$"), choose_task),
-            CommandHandler("skip", skip_handler),
-        ],
-        SOLVING: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, answer_handler),
-            CommandHandler("skip", skip_handler),
-        ],
-    },
-    fallbacks=[CommandHandler("start", start)],
-)
-
-dispatcher.add_handler(conv_handler)
-
-# --- Flask route для webhook ---
-
-@app.route(f"/{BOT_TOKEN}", methods=["POST"])
-def webhook():
-    if request.method == "POST":
-        update = Update.de_json(request.get_json(force=True), bot)
-        dispatcher.process_update(update)
-        return "ok", 200
+    if text == 'Задача 1':
+        task = generate_task1()
+    elif text == 'Задача 2':
+        task = generate_task2()
+    elif text == 'Задача 3':
+        task = generate_task3()
+    elif text == 'Задача 4':
+        task = generate_task4()
     else:
-        abort(405)
+        await update.message.reply_text("Пожалуйста, выберите задачу из меню.")
+        return CHOOSING
+
+    user_state[user_id] = task
+    await update.message.reply_text(task['text'])
+    return SOLVING
+
+async def answer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    answer = update.message.text.strip()
+
+    if user_id not in user_state:
+        await update.message.reply_text("Сначала выберите задачу командой /start")
+        return CHOOSING
+
+    task = user_state[user_id]
+    correct = task['answer']
+
+    if answer == correct:
+        await update.message.reply_text("✅ Правильно! Молодец!\n/start для новой задачи", reply_markup=menu_keyboard)
+    else:
+        await update.message.reply_text(f"❌ Неверно.\nПравильный ответ:\n{correct}\n\nРешение:\n{task['solution']}", reply_markup=menu_keyboard)
+
+    del user_state[user_id]
+    return CHOOSING
+
+async def skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in user_state:
+        await update.message.reply_text("Сначала выберите задачу /start")
+        return CHOOSING
+    task = user_state[user_id]
+    await update.message.reply_text(f"Ответ: {task['answer']}\n\nРешение:\n{task['solution']}", reply_markup=menu_keyboard)
+    del user_state[user_id]
+    return CHOOSING
+
+def main():
+    token = os.getenv("BOT_TOKEN")
+    if not token:
+        print("❌ BOT_TOKEN не найден!")
+        return
+
+    app = ApplicationBuilder().token(token).build()
+
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            CHOOSING: [
+                MessageHandler(filters.Regex("^Задача [1-4]$"), choose_task),
+                CommandHandler("skip", skip_handler),
+            ],
+            SOLVING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, answer_handler),
+                CommandHandler("skip", skip_handler),
+            ],
+        },
+        fallbacks=[CommandHandler("start", start)],
+    )
+
+    app.add_handler(conv_handler)
+    app.run_polling()
 
 if __name__ == "__main__":
-    # Запускаем Flask на нужном порту (обычно Render использует порт из env PORT)
-    port = int(os.environ.get("PORT", "5000"))
-    app.run(host="0.0.0.0", port=port)
+    main()
