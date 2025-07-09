@@ -52,7 +52,7 @@ def cut_digits(number, max_digits):
     return s[:max_digits]
 
 def float_to_u_format(value: float) -> str:
-    int_value = int(value)  # Без округления
+    int_value = int(value)
     s = str(int_value)
     if len(s) <= 2:
         return f"0-{s.zfill(2)}"
@@ -75,27 +75,25 @@ def generate_task1():
         'text': f'Дальность = {Дальность}, Угломер = {Угломер_str}\nВопрос: Высота′ = ?, Высота = ?',
         'answer': f'{Высота_out},{Высота_final_out}',
         'solution': (f'Угломер = {Угломер_value}\n'
-                     f'{Дальность} * {Угломер_value} / 1000 = {Высота_prime:.6f} → Высота′={Высота_out}\n'
-                     f'{Высота_prime:.6f} * 1.05 = {Высота:.6f} → Высота={Высота_final_out}')
+                     f'{Дальность} * {Угломер_value} / 1000 = {Высота_prime} → Высота′={Высота_out}\n'
+                     f'{Высота_prime} * 1.05 = {Высота} → Высота={Высота_final_out}')
     }
 
 def generate_task2():
-    Угломер_prime_str, left, right = generate_random_u_format()
-    Угломер_prime_value = parse_u_value(left, right)
-
     Высота = random.randint(10, 500)
+    Дальность = random.randint(10, 500)
 
-    Дальность = Высота * 1000 / Угломер_prime_value
-    Дальность_out = cut_digits(Дальность, 4)  # Усечение до 4 цифр целой части без округления
-
+    Угломер_prime_value = Высота * 1000 / Дальность
     Угломер_value = Угломер_prime_value * 0.95
+
+    Угломер_prime_str = float_to_u_format(Угломер_prime_value)
     Угломер_str = float_to_u_format(Угломер_value)
 
     return {
-        'text': f'Дальность = {Дальность_out}, Высота = {Высота}\nВопрос: Угломер′ = ?, Угломер = ?',
+        'text': f'Дальность = {Дальность}, Высота = {Высота}\nВопрос: Угломер′ = ?, Угломер = ?',
         'answer': f'{Угломер_prime_str},{Угломер_str}',
-        'solution': (f'{Высота} * 1000 / {Дальность:.6f} = {Угломер_prime_value:.6f} → Угломер′={Угломер_prime_str}\n'
-                     f'{Угломер_prime_value:.6f} * 0.95 = {Угломер_value:.6f} → Угломер={Угломер_str}')
+        'solution': (f'{Высота} * 1000 / {Дальность} = {Угломер_prime_value} → Угломер′={Угломер_prime_str}\n'
+                     f'{Угломер_prime_value} * 0.95 = {Угломер_value} → Угломер={Угломер_str}')
     }
 
 def generate_task3():
@@ -113,8 +111,8 @@ def generate_task3():
         'text': f'Высота = {Высота}, Угломер = {Угломер_str}\nВопрос: Дальность′ = ?, Дальность = ?',
         'answer': f'{Дальность_prime_out},{Дальность_out}',
         'solution': (f'Угломер = {Угломер_value}\n'
-                     f'{Высота} * 1000 / {Угломер_value} = {Дальность_prime:.6f} → Дальность′={Дальность_prime_out}\n'
-                     f'{Дальность_prime:.6f} * 0.95 = {Дальность:.6f} → Дальность={Дальность_out}')
+                     f'{Высота} * 1000 / {Угломер_value} = {Дальность_prime} → Дальность′={Дальность_prime_out}\n'
+                     f'{Дальность_prime} * 0.95 = {Дальность} → Дальность={Дальность_out}')
     }
 
 def generate_task4():
@@ -198,7 +196,7 @@ async def skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CHOOSING
 
 def main():
-    token = os.getenv("BOT_TOKEN")  # ← Используется переменная окружения
+    token = os.getenv("BOT_TOKEN")
     if not token:
         print("❌ BOT_TOKEN не найден!")
         return
