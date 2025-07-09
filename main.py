@@ -93,8 +93,10 @@ def generate_task2():
 
     U_prime_str = f"{left}-{right}"
     U_prime_value = parse_u_value(left, right)
-    U_value = int(U_prime_value * 0.95)
-    U_str = u_number_to_format(U_value)
+
+    # ❗ Убираем округление до int
+    U_value = U_prime_value * 0.95
+    U_str = u_number_to_format(U_value)  # Конвертируем для отображения, округляем ТОЛЬКО здесь
 
     D = random.randint(1, 9999)
     V = int(U_prime_value * D / 1000)
@@ -224,7 +226,7 @@ def main():
     )
 
     app.add_handler(conv_handler)
-    app.add_error_handler(error_handler)  # <--- вот здесь добавлен обработчик ошибок
+    app.add_error_handler(error_handler)
 
     print("✅ Бот запущен...")
 
@@ -233,3 +235,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
