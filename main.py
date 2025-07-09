@@ -197,7 +197,7 @@ async def skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     del user_state[user_id]
     return CHOOSING
 
-# --- ВЕБ-СЕРВЕР ДЛЯ UPTIME ROBOT ---
+# --- ВЕБ-СЕРВЕР ДЛЯ Render ---
 
 async def handle(request):
     return web.Response(text="OK")
@@ -239,7 +239,7 @@ async def main():
 
     app.add_handler(conv_handler)
 
-    # Запуск Telegram бота и веб-сервера параллельно
+    # Запускаем Telegram бота и веб-сервер параллельно
     await asyncio.gather(
         app.run_polling(),
         run_webserver()
