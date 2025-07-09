@@ -11,8 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-# Импортируем keep_alive
-from keep_alive import keep_alive
+from keep_alive import keep_alive  # если используешь Render и Flask
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -23,11 +22,11 @@ CHOOSING, SOLVING = range(2)
 user_state = {}
 
 menu_keyboard = ReplyKeyboardMarkup(
-    [['Задача 1', 'Задача 2', 'Задача 3'], ['/skip', '/start']],
+    [['Задача 1', 'Задача 2', 'Задача 3'], ['Задача 4'], ['/skip', '/start']],
     resize_keyboard=True
 )
 
-# --- ФУНКЦИИ ОБРАБОТКИ ЗАДАЧ ---
+# --- ОБЩИЕ ФУНКЦИИ ---
 
 def generate_random_u_format():
     format_type = random.choice(['0-x', '0-xx', 'x-xx', 'xx-xx'])
@@ -63,6 +62,8 @@ def u_number_to_format(n):
 def cut_digits(number, max_digits):
     return str(int(number))[:max_digits]
 
+# --- ЗАДАЧА 1 ---
+
 def generate_task1():
     D = random.randint(1, 9999)
     U_str, left, right = generate_random_u_format()
@@ -77,6 +78,8 @@ def generate_task1():
         'solution': f'У = {U_value}\n{D} * {U_value} / 1000 = {V_prime_raw:.6f} → В′={V_prime_out}\n'
                     f'{V_prime_raw:.6f} * 1.05 = {V:.6f} → В={V_out}'
     }
+
+# --- ЗАДАЧА 2 ---
 
 def generate_task2():
     format_type = random.choice(['0-xx', 'x-xx', 'xx-xx'])
@@ -93,10 +96,8 @@ def generate_task2():
 
     U_prime_str = f"{left}-{right}"
     U_prime_value = parse_u_value(left, right)
-
-    # ❗ Убираем округление до int
-    U_value = U_prime_value * 0.95
-    U_str = u_number_to_format(U_value)  # Конвертируем для отображения, округляем ТОЛЬКО здесь
+    U_value = int(U_prime_value * 0.95)
+    U_str = u_number_to_format(U_value)
 
     D = random.randint(1, 9999)
     V = int(U_prime_value * D / 1000)
@@ -107,6 +108,8 @@ def generate_task2():
         'solution': f'{V} * 1000 / {D} = {U_prime_value:.6f} → У′={U_prime_str}\n'
                     f'{U_prime_value:.6f} * 0.95 = {U_value:.6f} → У={U_str}'
     }
+
+# --- ЗАДАЧА 3 ---
 
 def generate_task3():
     V = random.randint(1, 999)
@@ -123,14 +126,28 @@ def generate_task3():
                     f'{D_prime:.6f} * 0.95 = {D:.6f} → Д={D_out}'
     }
 
-# --- ХЕНДЛЕРЫ ТЕЛЕГРАМ ---
+# --- ЗАДАЧА 4 ---
+
+def generate_task4():
+    az_target = random.randint(1, 359)
+    az_reference = random.randint(1, 359)
+    delta = az_target - az_reference
+    course = delta if delta >= 0 else delta + 360
+
+    return {
+        'text': f'Азимут цели = {az_target}, Азимут ориентира = {az_reference}\nВопрос: Числовой курс цели = ?',
+        'answer': f'{course}',
+        'solution': f'{az_target} - {az_reference} = {delta}{" + 360" if delta < 0 else ""} = {course}'
+    }
+
+# --- ХЕНДЛЕРЫ ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Привет! Я бот для расчётных задач.\n\n"
         "Выбирай одну из задач ниже:\n"
-        "📌 Формат ответа: В′,В или У′,У или Д′,Д (через запятую)\n"
-        "📌 Пример: 112,118 или 0–54,0–51 или 3010,2859\n"
+        "📌 Формат ответа: В′,В или У′,У или Д′,Д или просто число для задачи 4\n"
+        "📌 Пример: 112,118 или 0–54,0–51 или 3010,2859 или 8\n"
         "📌 Ограничения:\n"
         "• В и В′ — максимум 3 цифры\n"
         "• Д и Д′ — максимум 4 цифры\n"
@@ -151,6 +168,8 @@ async def choose_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task = generate_task2()
     elif task_text == 'Задача 3':
         task = generate_task3()
+    elif task_text == 'Задача 4':
+        task = generate_task4()
     else:
         return CHOOSING
 
@@ -196,8 +215,6 @@ async def skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔁 Хотите новую задачу? Выберите ниже:", reply_markup=menu_keyboard)
     return CHOOSING
 
-# --- ОБРАБОТЧИК ОШИБОК ---
-
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logging.error("❌ Ошибка при обработке обновления:", exc_info=context.error)
 
@@ -215,7 +232,7 @@ def main():
         entry_points=[CommandHandler("start", start)],
         states={
             CHOOSING: [
-                MessageHandler(filters.Regex("^(Задача 1|Задача 2|Задача 3)$"), choose_task),
+                MessageHandler(filters.Regex("^(Задача 1|Задача 2|Задача 3|Задача 4)$"), choose_task),
             ],
             SOLVING: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_answer),
@@ -235,4 +252,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
