@@ -10,6 +10,8 @@ from telegram.ext import (
     ConversationHandler,
     filters,
 )
+from aiohttp import web
+import asyncio
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -195,7 +197,24 @@ async def skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     del user_state[user_id]
     return CHOOSING
 
-def main():
+# --- ВЕБ-СЕРВЕР ДЛЯ UPTIME ROBOT ---
+
+async def handle(request):
+    return web.Response(text="OK")
+
+async def run_webserver():
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", 8080))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f"Web server started on port {port}")
+
+# --- ГЛАВНАЯ ФУНКЦИЯ ---
+
+async def main():
     token = os.getenv("BOT_TOKEN")
     if not token:
         print("❌ BOT_TOKEN не найден!")
@@ -219,7 +238,12 @@ def main():
     )
 
     app.add_handler(conv_handler)
-    app.run_polling()
+
+    # Запуск Telegram бота и веб-сервера параллельно
+    await asyncio.gather(
+        app.run_polling(),
+        run_webserver()
+    )
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
