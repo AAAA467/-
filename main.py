@@ -1,10 +1,9 @@
 import os
 import random
 import logging
-from flask import Flask, request, abort
-from telegram import Update, Bot, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    Application,
+    ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     ContextTypes,
@@ -25,7 +24,7 @@ menu_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# --- ЗАДАЧИ и ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ --- (оставляем без изменений)
+# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
 def generate_random_u_format():
     format_type = random.choice(['0-x', '0-xx', 'x-xx', 'xx-xx'])
@@ -61,6 +60,8 @@ def float_to_u_format(value: float) -> str:
         return f"{s[0]}-{s[1:]}"
     else:
         return f"{s[:2]}-{s[2:]}"
+
+# --- ЗАДАЧИ ---
 
 def generate_task1():
     Дальность = random.randint(1, 9999)
@@ -194,45 +195,31 @@ async def skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     del user_state[user_id]
     return CHOOSING
 
-# --- Flask + Telegram webhook setup ---
+def main():
+    token = os.getenv("BOT_TOKEN")
+    if not token:
+        print("❌ BOT_TOKEN не найден!")
+        return
 
-app = Flask(__name__)
+    app = ApplicationBuilder().token(token).build()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN environment variable not set")
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            CHOOSING: [
+                MessageHandler(filters.Regex("^Задача [1-4]$"), choose_task),
+                CommandHandler("skip", skip_handler),
+            ],
+            SOLVING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, answer_handler),
+                CommandHandler("skip", skip_handler),
+            ],
+        },
+        fallbacks=[CommandHandler("start", start)],
+    )
 
-bot = Bot(token=BOT_TOKEN)
-application = Application.builder().bot(bot).build()
-
-# Добавляем обработчики в application
-conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("start", start)],
-    states={
-        CHOOSING: [
-            MessageHandler(filters.Regex("^Задача [1-4]$"), choose_task),
-            CommandHandler("skip", skip_handler),
-        ],
-        SOLVING: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, answer_handler),
-            CommandHandler("skip", skip_handler),
-        ],
-    },
-    fallbacks=[CommandHandler("start", start)],
-)
-
-application.add_handler(conv_handler)
-
-@app.route(f"/webhook/{BOT_TOKEN}", methods=["POST"])
-def webhook():
-    if request.method == "POST":
-        update = Update.de_json(request.get_json(force=True), bot)
-        application.process_update(update)
-        return "OK"
-    else:
-        abort(405)
+    app.add_handler(conv_handler)
+    app.run_polling()
 
 if __name__ == "__main__":
-    # Для локального теста можно запустить Flask
-    # На продакшене Render запустит этот файл через gunicorn, например
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    main()
