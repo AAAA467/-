@@ -28,8 +28,6 @@ menu_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-
 def generate_random_u_format():
     format_type = random.choice(['0-x', '0-xx', 'x-xx', 'xx-xx'])
     if format_type == '0-x':
@@ -52,7 +50,7 @@ def parse_u_value(left, right):
     return int(f"{left}{right:02d}")
 
 def cut_digits(number, max_digits):
-    s = str(int(number))  # Только целая часть
+    s = str(int(number))
     return s[:max_digits]
 
 def float_to_u_format(value: float) -> str:
@@ -64,8 +62,6 @@ def float_to_u_format(value: float) -> str:
         return f"{s[0]}-{s[1:]}"
     else:
         return f"{s[:2]}-{s[2:]}"
-
-# --- ЗАДАЧИ ---
 
 def generate_task1():
     Дальность = random.randint(1, 9999)
@@ -86,13 +82,10 @@ def generate_task1():
 def generate_task2():
     Высота = random.randint(10, 500)
     Дальность = random.randint(10, 500)
-
     Угломер_prime_value = Высота * 1000 / Дальность
     Угломер_value = Угломер_prime_value * 0.95
-
     Угломер_prime_str = float_to_u_format(Угломер_prime_value)
     Угломер_str = float_to_u_format(Угломер_value)
-
     return {
         'text': f'Дальность = {Дальность}, Высота = {Высота}\nВопрос: Угломер′ = ?, Угломер = ?',
         'answer': f'{Угломер_prime_str},{Угломер_str}',
@@ -104,13 +97,10 @@ def generate_task3():
     Высота = random.randint(10, 500)
     Угломер_str, left, right = generate_random_u_format()
     Угломер_value = parse_u_value(left, right)
-
     Дальность_prime = (Высота * 1000) / Угломер_value
     Дальность = Дальность_prime * 0.95
-
     Дальность_prime_out = cut_digits(Дальность_prime, 4)
     Дальность_out = cut_digits(Дальность, 4)
-
     return {
         'text': f'Высота = {Высота}, Угломер = {Угломер_str}\nВопрос: Дальность′ = ?, Дальность = ?',
         'answer': f'{Дальность_prime_out},{Дальность_out}',
@@ -122,16 +112,14 @@ def generate_task3():
 def generate_task4():
     азимут_цели = random.randint(1, 359)
     азимут_ориентира = random.randint(1, 359)
-    числовой_курс = азимут_цели - азимут_ориентира
-    if числовой_курс < 0:
-        числовой_курс += 360
+    числовой_курс = (азимут_цели - азимут_ориентира) % 360
     return {
         'text': f'Азимут цели = {азимут_цели}, Азимут ориентира = {азимут_ориентира}\nВопрос: Числовой курс цели = ?',
         'answer': str(числовой_курс),
-        'solution': f'Числовой курс цели = {азимут_цели} - {азимут_ориентира} = {числовой_курс}'
+        'solution': f'Числовой курс цели = ({азимут_цели} - {азимут_ориентира}) % 360 = {числовой_курс}'
     }
 
-# --- ХЕНДЛЕРЫ ---
+# --- Хендлеры ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -153,7 +141,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def choose_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
-
+    task = None
     if text == 'Задача 1':
         task = generate_task1()
     elif text == 'Задача 2':
@@ -165,7 +153,6 @@ async def choose_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Пожалуйста, выберите задачу из меню.")
         return CHOOSING
-
     user_state[user_id] = task
     await update.message.reply_text(task['text'])
     return SOLVING
@@ -173,37 +160,32 @@ async def choose_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def answer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     answer = update.message.text.strip()
-
-    if user_id not in user_state:
+    task = user_state.get(user_id)
+    if not task:
         await update.message.reply_text("Сначала выберите задачу командой /start")
         return CHOOSING
-
-    task = user_state[user_id]
-    correct = task['answer']
-
-    if answer == correct:
+    if answer == task['answer']:
         await update.message.reply_text("✅ Правильно! Молодец!\n/start для новой задачи", reply_markup=menu_keyboard)
     else:
-        await update.message.reply_text(f"❌ Неверно.\nПравильный ответ:\n{correct}\n\nРешение:\n{task['solution']}", reply_markup=menu_keyboard)
-
+        await update.message.reply_text(f"❌ Неверно.\nПравильный ответ:\n{task['answer']}\n\nРешение:\n{task['solution']}", reply_markup=menu_keyboard)
     del user_state[user_id]
     return CHOOSING
 
 async def skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id not in user_state:
+    task = user_state.get(user_id)
+    if not task:
         await update.message.reply_text("Сначала выберите задачу /start")
         return CHOOSING
-    task = user_state[user_id]
     await update.message.reply_text(f"Ответ: {task['answer']}\n\nРешение:\n{task['solution']}", reply_markup=menu_keyboard)
     del user_state[user_id]
     return CHOOSING
 
-# --- FLASK + WEBHOOK ---
+# --- Flask + Telegram Webhook ---
 
 flask_app = Flask(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # https://your-app.onrender.com
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # например: https://yourapp.onrender.com
 
 telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -226,7 +208,7 @@ telegram_app.add_handler(conv_handler)
 
 @flask_app.route("/")
 def index():
-    return "🤖 Бот работает!"
+    return "🤖 Бот запущен!"
 
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
@@ -235,10 +217,13 @@ def webhook():
     return "OK"
 
 def run_flask():
-    port = int(os.environ.get("PORT", 5000))
-    flask_app.run(host="0.0.0.0", port=port)
+    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
 async def main():
+    if not BOT_TOKEN or not WEBHOOK_URL:
+        print("❌ BOT_TOKEN или WEBHOOK_URL не заданы в переменных окружения.")
+        return
+
     await telegram_app.bot.delete_webhook()
     await telegram_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
     print("✅ Вебхук установлен.")
@@ -248,7 +233,8 @@ async def main():
 
     await telegram_app.initialize()
     await telegram_app.start()
-    await telegram_app.updater.start_polling()  # необязательно, но безопасно
+    await telegram_app.updater.start()  # запускает приём очереди
+    await telegram_app.updater.start_webhook()
     await telegram_app.idle()
 
 if __name__ == "__main__":
