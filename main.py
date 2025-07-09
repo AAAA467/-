@@ -27,7 +27,7 @@ menu_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# --- Вспомогательные функции ---
+# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
 def generate_random_u_format():
     format_type = random.choice(['0-x', '0-xx', 'x-xx', 'xx-xx'])
@@ -54,7 +54,7 @@ def u_number_to_format(n):
     i = int(n)
     s = str(i)
     if len(s) <= 2:
-        return f"0-{s}"
+        return f"0-{s.zfill(2)}"
     elif len(s) == 3:
         return f"{s[0]}-{s[1:]}"
     else:
@@ -66,68 +66,79 @@ def cut_digits(number, max_digits):
         s = s.split('.')[0]  # берём только целую часть без округления и точки
     return s[:max_digits]
 
-# --- Генерация задач ---
+def float_to_u_format(value: float) -> str:
+    """Преобразует число в формат 'xx-xx', отсекая дробную часть без округления."""
+    int_value = int(value)  # отбрасываем дробь
+    s = str(int_value)
+    if len(s) <= 2:
+        # 0-xx
+        return f"0-{s.zfill(2)}"
+    elif len(s) == 3:
+        # x-xx
+        return f"{s[0]}-{s[1:]}"
+    else:
+        # xx-xx
+        return f"{s[:2]}-{s[2:]}"
+
+# --- ЗАДАЧИ ---
 
 def generate_task1():
     Дальность = random.randint(1, 9999)
     Угломер_str, left, right = generate_random_u_format()
     Угломер_value = parse_u_value(left, right)
-    Высота_prime_raw = (Дальность * Угломер_value) / 1000
-    Высота = Высота_prime_raw * 1.05
-    Высота_prime_out = cut_digits(Высота_prime_raw, 3)
-    Высота_out = cut_digits(Высота, 3)
+    Высота_raw = (Дальность * Угломер_value) / 1000
+    Высота = Высота_raw * 1.05
+    Высота_out = cut_digits(Высота_raw, 3)
+    Высота_final_out = cut_digits(Высота, 3)
     return {
         'text': f'Дальность = {Дальность}, Угломер = {Угломер_str}\nВопрос: Высота′ = ?, Высота = ?',
-        'answer': f'{Высота_prime_out},{Высота_out}',
-        'solution': f'Угломер = {Угломер_value}\n{Дальность} * {Угломер_value} / 1000 = {Высота_prime_raw:.6f} → Высота′={Высота_prime_out}\n'
-                    f'{Высота_prime_raw:.6f} * 1.05 = {Высота:.6f} → Высота={Высота_out}'
+        'answer': f'{Высота_out},{Высота_final_out}',
+        'solution': (f'Угломер = {Угломер_value}\n'
+                     f'{Дальность} * {Угломер_value} / 1000 = {Высота_raw:.6f} → Высота′={Высота_out}\n'
+                     f'{Высота_raw:.6f} * 1.05 = {Высота:.6f} → Высота={Высота_final_out}')
     }
 
 def generate_task2():
-    format_type = random.choice(['0-xx', 'x-xx', 'xx-xx'])
-
-    if format_type == '0-xx':
-        left = 0
-        right = random.randint(10, 99)
-    elif format_type == 'x-xx':
-        left = random.randint(1, 9)
-        right = random.randint(10, 99)
-    else:
-        left = random.randint(10, 99)
-        right = random.randint(10, 99)
-
-    Угломер_prime_str = f"{left}-{right}"
+    # Генерируем Угломер′ в формате
+    Угломер_prime_str, left, right = generate_random_u_format()
     Угломер_prime_value = parse_u_value(left, right)
-    Угломер_value = Угломер_prime_value * 0.95  # оставляем float без округления
-    Угломер_str = u_number_to_format(int(Угломер_value))
 
-    Дальность = random.randint(1, 9999)
-    Высота = random.randint(10, 500)  # Высота в диапазоне 10..500
+    Высота = random.randint(10, 500)  # строго 10..500
 
-    # Восстановим Высота для корректного соотношения с Угломер_prime_value и Дальность
-    # Пересчитаем Высота исходя из формулы, чтобы высчитать Угломер_prime_value корректно:
-    Высота = Угломер_prime_value * Дальность / 1000
+    # Рассчитываем Дальность под формулу
+    Дальность = Высота * 1000 / Угломер_prime_value
+
+    # Угломер с коэффициентом 0.95, без округления
+    Угломер_value = Угломер_prime_value * 0.95
+
+    # Форматируем угломеры без округления
+    Угломер_prime_str_correct = Угломер_prime_str
+    Угломер_str = float_to_u_format(Угломер_value)
 
     return {
-        'text': f'Дальность = {Дальность}, Высота = {int(Высота)}\nВопрос: Угломер′ = ?, Угломер = ?',
-        'answer': f'{Угломер_prime_str},{Угломер_str}',
-        'solution': f'{int(Высота)} * 1000 / {Дальность} = {Угломер_prime_value:.6f} → Угломер′={Угломер_prime_str}\n'
-                    f'{Угломер_prime_value:.6f} * 0.95 = {Угломер_value:.6f} → Угломер={Угломер_str}'
+        'text': f'Дальность = {int(Дальность)}, Высота = {Высота}\nВопрос: Угломер′ = ?, Угломер = ?',
+        'answer': f'{Угломер_prime_str_correct},{Угломер_str}',
+        'solution': (f'{Высота} * 1000 / {int(Дальность)} = {Угломер_prime_value:.9f} → Угломер′={Угломер_prime_str_correct}\n'
+                     f'{Угломер_prime_value:.9f} * 0.95 = {Угломер_value:.9f} → Угломер={Угломер_str}')
     }
 
 def generate_task3():
     Высота = random.randint(10, 500)
     Угломер_str, left, right = generate_random_u_format()
     Угломер_value = parse_u_value(left, right)
+
     Дальность_prime = (Высота * 1000) / Угломер_value
     Дальность = Дальность_prime * 0.95
+
     Дальность_prime_out = cut_digits(Дальность_prime, 4)
     Дальность_out = cut_digits(Дальность, 4)
+
     return {
         'text': f'Высота = {Высота}, Угломер = {Угломер_str}\nВопрос: Дальность′ = ?, Дальность = ?',
         'answer': f'{Дальность_prime_out},{Дальность_out}',
-        'solution': f'Угломер = {Угломер_value}\n{Высота} * 1000 / {Угломер_value} = {Дальность_prime:.6f} → Дальность′={Дальность_prime_out}\n'
-                    f'{Дальность_prime:.6f} * 0.95 = {Дальность:.6f} → Дальность={Дальность_out}'
+        'solution': (f'Угломер = {Угломер_value}\n'
+                     f'{Высота} * 1000 / {Угломер_value} = {Дальность_prime:.6f} → Дальность′={Дальность_prime_out}\n'
+                     f'{Дальность_prime:.6f} * 0.95 = {Дальность:.6f} → Дальность={Дальность_out}')
     }
 
 def generate_task4():
@@ -138,8 +149,8 @@ def generate_task4():
         числовой_курс += 360
     return {
         'text': f'Азимут цели = {азимут_цели}, Азимут ориентира = {азимут_ориентира}\nВопрос: Числовой курс цели = ?',
-        'answer': f'{числовой_курс}',
-        'solution': f'{азимут_цели} - {азимут_ориентира} = {числовой_курс}'
+        'answer': str(числовой_курс),
+        'solution': f'Числовой курс цели = {азимут_цели} - {азимут_ориентира} = {числовой_курс}'
     }
 
 # --- ХЕНДЛЕРЫ ТЕЛЕГРАМ ---
@@ -148,11 +159,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Привет! Я бот для расчётных задач.\n\n"
         "Выбирай одну из задач ниже:\n"
-        "📌 Формат ответа: Высота′,Высота или Угломер′,Угломер или Дальность′,Дальность или Числовой курс цели\n"
+        "📌 Формат ответа: Высота′,Высота или Угломер′,Угломер или Дальность′,Дальность или Числовой курс (для задачи 4)\n"
         "📌 Пример: 112,118 или 0–54,0–51 или 3010,2859 или 8\n"
         "📌 Ограничения:\n"
         "• Высота и Высота′ — максимум 3 цифры\n"
         "• Дальность и Дальность′ — максимум 4 цифры\n"
+        "• Высота в задачах от 10 до 500\n"
         "🛠 Команды:\n"
         "• /skip — показать ответ и решение\n"
         "• /start — начать заново\n",
@@ -173,65 +185,46 @@ async def choose_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif task_text == 'Задача 4':
         task = generate_task4()
     else:
+        await update.message.reply_text("Пожалуйста, выберите задачу из меню.")
         return CHOOSING
 
     user_state[user_id] = task
-    await update.message.reply_text(
-        f"📘 Условие:\n{task['text']}\n\n✍️ Введите ответ или /skip",
-        reply_markup=menu_keyboard
-    )
+    await update.message.reply_text(task['text'])
     return SOLVING
 
-async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def answer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    task = user_state.get(user_id)
+    user_answer = update.message.text.strip()
 
-    if not task:
-        await update.message.reply_text("⚠️ Нет активной задачи. Введите /start")
+    if user_id not in user_state:
+        await update.message.reply_text("Сначала выберите задачу командой /start")
         return CHOOSING
 
-    answer = update.message.text.strip()
+    task = user_state[user_id]
+    correct_answer = task['answer']
 
-    if answer == '/skip':
-        await update.message.reply_text(
-            f"✅ Правильный ответ: {task['answer']}\n\n📖 Решение:\n{task['solution']}",
-            reply_markup=menu_keyboard
-        )
-        return CHOOSING
-
-    if answer == task['answer']:
-        await update.message.reply_text(
-            "🎉 Верно! Можете выбрать другую задачу или /start для начала.",
-            reply_markup=menu_keyboard
-        )
-        return CHOOSING
+    if user_answer == correct_answer:
+        await update.message.reply_text("✅ Правильно! Поздравляю.\nДля выбора другой задачи нажми /start", reply_markup=menu_keyboard)
     else:
-        await update.message.reply_text(
-            "❌ Неверно. Попробуйте ещё раз или /skip для подсказки.",
-            reply_markup=menu_keyboard
-        )
-        return SOLVING
+        await update.message.reply_text(f"❌ Неверно.\nПравильный ответ:\n{correct_answer}\n\nРешение:\n{task['solution']}", reply_markup=menu_keyboard)
 
-async def skip_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    task = user_state.get(user_id)
-    if task:
-        await update.message.reply_text(
-            f"✅ Правильный ответ: {task['answer']}\n\n📖 Решение:\n{task['solution']}",
-            reply_markup=menu_keyboard
-        )
-    else:
-        await update.message.reply_text("⚠️ Нет активной задачи.")
+    del user_state[user_id]
     return CHOOSING
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🚪 Выход. До встречи!")
-    return ConversationHandler.END
+async def skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in user_state:
+        await update.message.reply_text("Сначала выберите задачу командой /start")
+        return CHOOSING
+    task = user_state[user_id]
+    await update.message.reply_text(f"Ответ: {task['answer']}\n\nРешение:\n{task['solution']}", reply_markup=menu_keyboard)
+    del user_state[user_id]
+    return CHOOSING
 
 def main():
-    token = os.environ.get("BOT_TOKEN")
+    token = os.getenv("TOKEN")
     if not token:
-        print("Ошибка: переменная окружения BOT_TOKEN не установлена")
+        print("Ошибка: токен бота не установлен в переменной окружения TOKEN")
         return
 
     application = ApplicationBuilder().token(token).build()
@@ -239,17 +232,23 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            CHOOSING: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_task)],
-            SOLVING: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_answer)]
+            CHOOSING: [
+                MessageHandler(filters.Regex('^(Задача 1|Задача 2|Задача 3|Задача 4)$'), choose_task),
+                CommandHandler('skip', skip_handler),
+            ],
+            SOLVING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, answer_handler),
+                CommandHandler('skip', skip_handler),
+            ],
         },
-        fallbacks=[CommandHandler('skip', skip_task), CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('start', start)],
     )
 
     application.add_handler(conv_handler)
 
-    print("Бот запущен...")
+    # keep_alive()  # Если используешь keep_alive для хостинга - раскомментируй
+
     application.run_polling()
 
 if __name__ == '__main__':
-    keep_alive()
     main()
