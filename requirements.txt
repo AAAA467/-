@@ -1,3 +1,5 @@
 python-telegram-bot
 Flask
 python-dotenv
+python-telegram-bot==20.6
+aiohttp
