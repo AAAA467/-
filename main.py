@@ -1,7 +1,6 @@
 import os
 import random
 import logging
-from fastapi import FastAPI, Request
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -49,18 +48,18 @@ def parse_u_value(left, right):
     return int(f"{left}{right:02d}")
 
 def cut_digits(number, max_digits):
-    s = str(number).replace('.', '')  # Убираем точку, чтоб посчитать только цифры
+    s = str(int(number))  # Только целая часть
     return s[:max_digits]
 
 def float_to_u_format(value: float) -> str:
-    s = str(value)
-    if '-' in s:
-        s = s.replace('-', '')
-    int_part, dot, frac_part = s.partition('.')
-    if len(int_part) >= 2:
-        return f"{int_part[:2]}-{int_part[2:4] if len(int_part) > 2 else ''}".rstrip('-')
+    int_value = int(value)
+    s = str(int_value)
+    if len(s) <= 2:
+        return f"0-{s.zfill(2)}"
+    elif len(s) == 3:
+        return f"{s[0]}-{s[1:]}"
     else:
-        return f"0-{int_part.zfill(2)}"
+        return f"{s[:2]}-{s[2:]}"
 
 # --- ЗАДАЧИ ---
 
@@ -70,8 +69,8 @@ def generate_task1():
     Угломер_value = parse_u_value(left, right)
     Высота_prime = (Дальность * Угломер_value) / 1000
     Высота = Высота_prime * 1.05
-    Высота_out = str(Высота_prime)[:3]
-    Высота_final_out = str(Высота)[:3]
+    Высота_out = cut_digits(Высота_prime, 3)
+    Высота_final_out = cut_digits(Высота, 3)
     return {
         'text': f'Дальность = {Дальность}, Угломер = {Угломер_str}\nВопрос: Высота′ = ?, Высота = ?',
         'answer': f'{Высота_out},{Высота_final_out}',
@@ -81,15 +80,13 @@ def generate_task1():
     }
 
 def generate_task2():
-    Угломер_prime_str, left, right = generate_random_u_format()
-    Угломер_prime_value = parse_u_value(left, right)
-
     Высота = random.randint(10, 500)
+    Дальность = random.randint(10, 500)
 
-    # Используем точное значение Дальности
-    Дальность = Высота * 1000 / Угломер_prime_value
-
+    Угломер_prime_value = Высота * 1000 / Дальность
     Угломер_value = Угломер_prime_value * 0.95
+
+    Угломер_prime_str = float_to_u_format(Угломер_prime_value)
     Угломер_str = float_to_u_format(Угломер_value)
 
     return {
@@ -107,8 +104,8 @@ def generate_task3():
     Дальность_prime = (Высота * 1000) / Угломер_value
     Дальность = Дальность_prime * 0.95
 
-    Дальность_prime_out = str(Дальность_prime)[:4]
-    Дальность_out = str(Дальность)[:4]
+    Дальность_prime_out = cut_digits(Дальность_prime, 4)
+    Дальность_out = cut_digits(Дальность, 4)
 
     return {
         'text': f'Высота = {Высота}, Угломер = {Угломер_str}\nВопрос: Дальность′ = ?, Дальность = ?',
@@ -198,26 +195,31 @@ async def skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     del user_state[user_id]
     return CHOOSING
 
-# --- FastAPI сервер и webhook ---
+def main():
+    token = os.getenv("BOT_TOKEN")
+    if not token:
+        print("❌ BOT_TOKEN не найден!")
+        return
 
-app = FastAPI()
-WEBHOOK_PATH = "/webhook"
+    app = ApplicationBuilder().token(token).build()
 
-application = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            CHOOSING: [
+                MessageHandler(filters.Regex("^Задача [1-4]$"), choose_task),
+                CommandHandler("skip", skip_handler),
+            ],
+            SOLVING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, answer_handler),
+                CommandHandler("skip", skip_handler),
+            ],
+        },
+        fallbacks=[CommandHandler("start", start)],
+    )
 
-@app.post(WEBHOOK_PATH)
-async def telegram_webhook(request: Request):
-    data = await request.json()
-    update = Update.de_json(data, application.bot)
-    await application.update_queue.put(update)
-    return {"ok": True}
-
-application.add_handler(CommandHandler("start", start))
-application.add_handler(MessageHandler(filters.Regex("^Задача [1-4]$"), choose_task))
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, answer_handler))
-application.add_handler(CommandHandler("skip", skip_handler))
+    app.add_handler(conv_handler)
+    app.run_polling()
 
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8080))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    main()
