@@ -11,7 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-from keep_alive import keep_alive  # если используешь Render и Flask
+from keep_alive import keep_alive
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -22,11 +22,9 @@ CHOOSING, SOLVING = range(2)
 user_state = {}
 
 menu_keyboard = ReplyKeyboardMarkup(
-    [['Задача 1', 'Задача 2', 'Задача 3'], ['Задача 4'], ['/skip', '/start']],
+    [['Задача 1', 'Задача 2', 'Задача 3', 'Задача 4'], ['/skip', '/start']],
     resize_keyboard=True
 )
-
-# --- ОБЩИЕ ФУНКЦИИ ---
 
 def generate_random_u_format():
     format_type = random.choice(['0-x', '0-xx', 'x-xx', 'xx-xx'])
@@ -62,14 +60,15 @@ def u_number_to_format(n):
 def cut_digits(number, max_digits):
     return str(int(number))[:max_digits]
 
-# --- ЗАДАЧА 1 ---
-
 def generate_task1():
-    D = random.randint(1, 9999)
-    U_str, left, right = generate_random_u_format()
-    U_value = parse_u_value(left, right)
-    V_prime_raw = (D * U_value) / 1000
-    V = V_prime_raw * 1.05
+    while True:
+        D = random.randint(1, 9999)
+        U_str, left, right = generate_random_u_format()
+        U_value = parse_u_value(left, right)
+        V_prime_raw = (D * U_value) / 1000
+        V = V_prime_raw * 1.05
+        if 10 <= V_prime_raw <= 500 and 10 <= V <= 500:
+            break
     V_prime_out = cut_digits(V_prime_raw, 3)
     V_out = cut_digits(V, 3)
     return {
@@ -79,44 +78,46 @@ def generate_task1():
                     f'{V_prime_raw:.6f} * 1.05 = {V:.6f} → В={V_out}'
     }
 
-# --- ЗАДАЧА 2 ---
-
 def generate_task2():
-    format_type = random.choice(['0-xx', 'x-xx', 'xx-xx'])
+    while True:
+        format_type = random.choice(['0-xx', 'x-xx', 'xx-xx'])
+        if format_type == '0-xx':
+            left = 0
+            right = random.randint(10, 99)
+        elif format_type == 'x-xx':
+            left = random.randint(1, 9)
+            right = random.randint(10, 99)
+        else:
+            left = random.randint(10, 99)
+            right = random.randint(10, 99)
 
-    if format_type == '0-xx':
-        left = 0
-        right = random.randint(10, 99)
-    elif format_type == 'x-xx':
-        left = random.randint(1, 9)
-        right = random.randint(10, 99)
-    else:
-        left = random.randint(10, 99)
-        right = random.randint(10, 99)
+        U_prime_str = f"{left}-{right}"
+        U_prime_value = parse_u_value(left, right)
+        U_value = U_prime_value * 0.95
+        U_str = u_number_to_format(U_value)
 
-    U_prime_str = f"{left}-{right}"
-    U_prime_value = parse_u_value(left, right)
-    U_value = int(U_prime_value * 0.95)
-    U_str = u_number_to_format(U_value)
+        D = random.randint(1, 9999)
+        V = (U_prime_value * D) / 1000
 
-    D = random.randint(1, 9999)
-    V = int(U_prime_value * D / 1000)
+        if 10 <= V <= 500:
+            break
 
     return {
-        'text': f'Д = {D}, В = {V}\nВопрос: У′ = ?, У = ?',
+        'text': f'Д = {D}, В = {int(V)}\nВопрос: У′ = ?, У = ?',
         'answer': f'{U_prime_str},{U_str}',
-        'solution': f'{V} * 1000 / {D} = {U_prime_value:.6f} → У′={U_prime_str}\n'
-                    f'{U_prime_value:.6f} * 0.95 = {U_value:.6f} → У={U_str}'
+        'solution': f'{int(V)} * 1000 / {D} = {U_prime_value:.12f} → У′={U_prime_str}\n'
+                    f'{U_prime_value:.12f} * 0.95 = {U_value:.12f} → У={U_str}'
     }
 
-# --- ЗАДАЧА 3 ---
-
 def generate_task3():
-    V = random.randint(1, 999)
-    U_str, left, right = generate_random_u_format()
-    U_value = parse_u_value(left, right)
-    D_prime = (V * 1000) / U_value
-    D = D_prime * 0.95
+    while True:
+        V = random.randint(10, 500)
+        U_str, left, right = generate_random_u_format()
+        U_value = parse_u_value(left, right)
+        D_prime = (V * 1000) / U_value
+        D = D_prime * 0.95
+        if 10 <= D_prime <= 9999 and 10 <= D <= 9999:
+            break
     D_prime_out = cut_digits(D_prime, 4)
     D_out = cut_digits(D, 4)
     return {
@@ -126,30 +127,27 @@ def generate_task3():
                     f'{D_prime:.6f} * 0.95 = {D:.6f} → Д={D_out}'
     }
 
-# --- ЗАДАЧА 4 ---
-
 def generate_task4():
-    az_target = random.randint(1, 359)
-    az_reference = random.randint(1, 359)
-    delta = az_target - az_reference
-    course = delta if delta >= 0 else delta + 360
-
+    azimuth_target = random.randint(1, 359)
+    azimuth_reference = random.randint(1, 359)
+    raw_course = azimuth_target - azimuth_reference
+    if raw_course < 0:
+        raw_course += 360
     return {
-        'text': f'Азимут цели = {az_target}, Азимут ориентира = {az_reference}\nВопрос: Числовой курс цели = ?',
-        'answer': f'{course}',
-        'solution': f'{az_target} - {az_reference} = {delta}{" + 360" if delta < 0 else ""} = {course}'
+        'text': f'Азимут цели = {azimuth_target}, Азимут ориентира = {azimuth_reference}\nВопрос: Числовой курс цели = ?',
+        'answer': f'{raw_course}',
+        'solution': f'{azimuth_target} - {azimuth_reference} = {azimuth_target - azimuth_reference} → '
+                    f'Числовой курс цели = {raw_course}'
     }
-
-# --- ХЕНДЛЕРЫ ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Привет! Я бот для расчётных задач.\n\n"
         "Выбирай одну из задач ниже:\n"
-        "📌 Формат ответа: В′,В или У′,У или Д′,Д или просто число для задачи 4\n"
+        "📌 Формат ответа: В′,В или У′,У или Д′,Д или Число\n"
         "📌 Пример: 112,118 или 0–54,0–51 или 3010,2859 или 8\n"
         "📌 Ограничения:\n"
-        "• В и В′ — максимум 3 цифры\n"
+        "• В и В′ — от 10 до 500\n"
         "• Д и Д′ — максимум 4 цифры\n"
         "🛠 Команды:\n"
         "• /skip — показать ответ и решение\n"
@@ -218,12 +216,10 @@ async def skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logging.error("❌ Ошибка при обработке обновления:", exc_info=context.error)
 
-# --- MAIN ---
-
 def main():
     TOKEN = os.environ.get("BOT_TOKEN")
     if not TOKEN:
-        print("❌ Установите переменную окружения BOT_TOKEN в настройках Replit!")
+        print("❌ Установите переменную окружения BOT_TOKEN!")
         return
 
     app = ApplicationBuilder().token(TOKEN).build()
@@ -246,7 +242,6 @@ def main():
     app.add_error_handler(error_handler)
 
     print("✅ Бот запущен...")
-
     keep_alive()
     app.run_polling()
 
