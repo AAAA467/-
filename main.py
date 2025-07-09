@@ -10,7 +10,9 @@ from telegram.ext import (
     ConversationHandler,
     filters,
 )
+from aiohttp import web
 
+# --- НАСТРОЙКА ЛОГИРОВАНИЯ ---
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -25,7 +27,6 @@ menu_keyboard = ReplyKeyboardMarkup(
 )
 
 # --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-
 def generate_random_u_format():
     format_type = random.choice(['0-x', '0-xx', 'x-xx', 'xx-xx'])
     if format_type == '0-x':
@@ -62,7 +63,6 @@ def float_to_u_format(value: float) -> str:
         return f"{s[:2]}-{s[2:]}"
 
 # --- ЗАДАЧИ ---
-
 def generate_task1():
     Дальность = random.randint(1, 9999)
     Угломер_str, left, right = generate_random_u_format()
@@ -72,27 +72,28 @@ def generate_task1():
     Высота_out = cut_digits(Высота_prime, 3)
     Высота_final_out = cut_digits(Высота, 3)
     return {
-        'text': f'Дальность = {Дальность}, Угломер = {Угломер_str}\nВопрос: Высота′ = ?, Высота = ?',
+        'text': f'Дальность = {Дальность}, Угломер = {Угломер_str}\nВопрос: Высота\u2032 = ?, Высота = ?',
         'answer': f'{Высота_out},{Высота_final_out}',
         'solution': (f'Угломер = {Угломер_value}\n'
-                     f'{Дальность} * {Угломер_value} / 1000 = {Высота_prime} → Высота′={Высота_out}\n'
+                     f'{Дальность} * {Угломер_value} / 1000 = {Высота_prime} → Высота\u2032={Высота_out}\n'
                      f'{Высота_prime} * 1.05 = {Высота} → Высота={Высота_final_out}')
     }
 
 def generate_task2():
+    Угломер_prime_str, left, right = generate_random_u_format()
+    Угломер_prime_value = parse_u_value(left, right)
+
     Высота = random.randint(10, 500)
-    Дальность = random.randint(10, 500)
 
-    Угломер_prime_value = Высота * 1000 / Дальность
+    Дальность = Высота * 1000 / Угломер_prime_value
+
     Угломер_value = Угломер_prime_value * 0.95
-
-    Угломер_prime_str = float_to_u_format(Угломер_prime_value)
     Угломер_str = float_to_u_format(Угломер_value)
 
     return {
-        'text': f'Дальность = {Дальность}, Высота = {Высота}\nВопрос: Угломер′ = ?, Угломер = ?',
+        'text': f'Дальность = {int(Дальность)}, Высота = {Высота}\nВопрос: Угломер\u2032 = ?, Угломер = ?',
         'answer': f'{Угломер_prime_str},{Угломер_str}',
-        'solution': (f'{Высота} * 1000 / {Дальность} = {Угломер_prime_value} → Угломер′={Угломер_prime_str}\n'
+        'solution': (f'{Высота} * 1000 / {int(Дальность)} = {Угломер_prime_value} → Угломер\u2032={Угломер_prime_str}\n'
                      f'{Угломер_prime_value} * 0.95 = {Угломер_value} → Угломер={Угломер_str}')
     }
 
@@ -108,10 +109,10 @@ def generate_task3():
     Дальность_out = cut_digits(Дальность, 4)
 
     return {
-        'text': f'Высота = {Высота}, Угломер = {Угломер_str}\nВопрос: Дальность′ = ?, Дальность = ?',
+        'text': f'Высота = {Высота}, Угломер = {Угломер_str}\nВопрос: Дальность\u2032 = ?, Дальность = ?',
         'answer': f'{Дальность_prime_out},{Дальность_out}',
         'solution': (f'Угломер = {Угломер_value}\n'
-                     f'{Высота} * 1000 / {Угломер_value} = {Дальность_prime} → Дальность′={Дальность_prime_out}\n'
+                     f'{Высота} * 1000 / {Угломер_value} = {Дальность_prime} → Дальность\u2032={Дальность_prime_out}\n'
                      f'{Дальность_prime} * 0.95 = {Дальность} → Дальность={Дальность_out}')
     }
 
@@ -128,18 +129,17 @@ def generate_task4():
     }
 
 # --- ХЕНДЛЕРЫ ---
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Привет! Я бот для расчётных задач.\n\n"
+        "\U0001F44B Привет! Я бот для расчётных задач.\n\n"
         "Выбирай одну из задач ниже:\n"
-        "📌 Формат ответа: Высота′,Высота или Угломер′,Угломер или Дальность′,Дальность или Числовой курс (для задачи 4)\n"
-        "📌 Пример: 112,118 или 0–54,0–51 или 3010,2859 или 8\n"
-        "📌 Ограничения:\n"
+        "\U0001F4CC Формат ответа: Высота′,Высота или Угломер′,Угломер или Дальность′,Дальность или Числовой курс (для задачи 4)\n"
+        "\U0001F4CC Пример: 112,118 или 0–54,0–51 или 3010,2859 или 8\n"
+        "\U0001F6E0 Ограничения:\n"
         "• Высота и Высота′ — максимум 3 цифры\n"
         "• Дальность и Дальность′ — максимум 4 цифры\n"
         "• Высота в задачах от 10 до 500\n"
-        "🛠 Команды:\n"
+        "\U0001F6E0 Команды:\n"
         "• /skip — показать ответ и решение\n"
         "• /start — начать заново\n",
         reply_markup=menu_keyboard
@@ -178,9 +178,9 @@ async def answer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     correct = task['answer']
 
     if answer == correct:
-        await update.message.reply_text("✅ Правильно! Молодец!\n/start для новой задачи", reply_markup=menu_keyboard)
+        await update.message.reply_text("\u2705 Правильно! Молодец!\n/start для новой задачи", reply_markup=menu_keyboard)
     else:
-        await update.message.reply_text(f"❌ Неверно.\nПравильный ответ:\n{correct}\n\nРешение:\n{task['solution']}", reply_markup=menu_keyboard)
+        await update.message.reply_text(f"\u274C Неверно.\nПравильный ответ:\n{correct}\n\nРешение:\n{task['solution']}", reply_markup=menu_keyboard)
 
     del user_state[user_id]
     return CHOOSING
@@ -195,10 +195,23 @@ async def skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     del user_state[user_id]
     return CHOOSING
 
+# --- ЗАПУСК С ВЕБХУКОМ ---
+async def handle_webhook(request):
+    data = await request.json()
+    await app.update_queue.put(data)
+    return web.Response()
+
+async def on_startup(web_app):
+    await app.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
+    print("\u2705 Webhook установлен:", f"{WEBHOOK_URL}/webhook")
+
 def main():
+    global app, WEBHOOK_URL
     token = os.getenv("BOT_TOKEN")
-    if not token:
-        print("❌ BOT_TOKEN не найден!")
+    WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+    if not token or not WEBHOOK_URL:
+        print("\u274C BOT_TOKEN или WEBHOOK_URL не заданы!")
         return
 
     app = ApplicationBuilder().token(token).build()
@@ -219,7 +232,12 @@ def main():
     )
 
     app.add_handler(conv_handler)
-    app.run_polling()
+
+    web_app = web.Application()
+    web_app.router.add_post("/webhook", handle_webhook)
+    web_app.on_startup.append(on_startup)
+
+    web.run_app(web_app, port=int(os.environ.get("PORT", 8080)))
 
 if __name__ == "__main__":
     main()
