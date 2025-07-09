@@ -1,6 +1,10 @@
 import os
 import random
 import logging
+from flask import Flask, request
+import asyncio
+from threading import Thread
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -195,31 +199,57 @@ async def skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     del user_state[user_id]
     return CHOOSING
 
-def main():
-    token = os.getenv("BOT_TOKEN")
-    if not token:
-        print("❌ BOT_TOKEN не найден!")
-        return
+# --- FLASK + WEBHOOK ---
 
-    app = ApplicationBuilder().token(token).build()
+flask_app = Flask(__name__)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # https://your-app.onrender.com
 
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            CHOOSING: [
-                MessageHandler(filters.Regex("^Задача [1-4]$"), choose_task),
-                CommandHandler("skip", skip_handler),
-            ],
-            SOLVING: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, answer_handler),
-                CommandHandler("skip", skip_handler),
-            ],
-        },
-        fallbacks=[CommandHandler("start", start)],
-    )
+telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    app.add_handler(conv_handler)
-    app.run_polling()
+conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("start", start)],
+    states={
+        CHOOSING: [
+            MessageHandler(filters.Regex("^Задача [1-4]$"), choose_task),
+            CommandHandler("skip", skip_handler),
+        ],
+        SOLVING: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, answer_handler),
+            CommandHandler("skip", skip_handler),
+        ],
+    },
+    fallbacks=[CommandHandler("start", start)],
+)
+
+telegram_app.add_handler(conv_handler)
+
+@flask_app.route("/")
+def index():
+    return "🤖 Бот работает!"
+
+@flask_app.route("/webhook", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), telegram_app.bot)
+    asyncio.run(telegram_app.update_queue.put(update))
+    return "OK"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 5000))
+    flask_app.run(host="0.0.0.0", port=port)
+
+async def main():
+    await telegram_app.bot.delete_webhook()
+    await telegram_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+    print("✅ Вебхук установлен.")
+
+    thread = Thread(target=run_flask)
+    thread.start()
+
+    await telegram_app.initialize()
+    await telegram_app.start()
+    await telegram_app.updater.start_polling()  # необязательно, но безопасно
+    await telegram_app.idle()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
